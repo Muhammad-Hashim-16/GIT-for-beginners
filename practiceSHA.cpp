@@ -26,8 +26,8 @@ string get_hash(string content) {
 }
 
 int main () {
-    string content;
-    cout << "Type anything: ";
-    cin >> content;
+    string content = "Hello, \nFileSystem!";
+    // cout << "Type anything: ";
+    // cin >> "Hello, FileSystem!";
     cout << get_hash(content);
 }

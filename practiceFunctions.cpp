@@ -60,14 +60,14 @@ void create_repo() {
 void show_status() {
     fs::path targetFolder = ".";
     for (const auto& entry : fs::recursive_directory_iterator(targetFolder)) {
-        cout << entry.path().filename().string() << endl;
+        cout << entry.path().string() << endl;
     }
 }
 
 void my_files() {
     vector<string> myFiles;
     string pathString;
-    for (const auto& entry : fs::recursive_directory_iterator("D:\\CS Project\\Practice")) {
+    for (const auto& entry : fs::directory_iterator(".")) {
         if (entry.is_regular_file()) {
             pathString = entry.path().string();
             myFiles.push_back(pathString);
@@ -86,9 +86,9 @@ string read_file_content() {
     if (!file.is_open()) {
         return "";
     }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
+    std::stringstream pizza;
+    pizza << file.rdbuf();
+    return pizza.str();
 }
 
 void create_blob_file(string filename, string content) {
@@ -101,3 +101,11 @@ void create_blob_file(string filename, string content) {
     blobFile.close();
     cout << "The file " << filename << " created with " << filename.size() << " bytes.";
 }
+
+
+int main () {
+    my_files();
+}
+
+
+
