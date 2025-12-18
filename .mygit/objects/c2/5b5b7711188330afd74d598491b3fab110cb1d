@@ -9,6 +9,10 @@
 using namespace std;
 namespace fs = std::filesystem;
 
+// Globally declared:
+
+// vector<string> indexHash; ~
+
 //  +++++++++++++++++++++++++  INIT  ++++++++++++++++++++++++++++
 
 void init_command() {
@@ -105,6 +109,10 @@ void create_blob_file(string stringHash, string content) {
     blobFile.close();
 }
 
+// void update_hash_vector(string blobHash) {
+//     indexHash.push_back(blobHash);
+// }
+
 vector<vector<string>> index_to_vector() {
     vector<vector<string>> indexTableVector;
     ifstream indexFile (".mygit/index");
@@ -194,9 +202,17 @@ void add_command(int argc, char* argv[]) {
 
         string stringHash = get_hash(stringContent);
 
+    // Check if the hash of the file is already in index vector or not
+
+        // for (int i=0; i<indexHash.size(); i++) {
+        //     if (stringHash == indexHash[i]) continue;
+        // }
+
     // Save the blob file in desired path
 
         create_blob_file(stringHash, stringContent);
+
+        // update_hash_vector(stringHash);
 
     // Update the hash of that file whose content is changed        
 
