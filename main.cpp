@@ -15,7 +15,7 @@ void init_command() {
     
     fs::path gitRepo = fs::current_path() / ".mygit";
 
-    if (fs::exists(gitRepo) && fs::exists(gitRepo / "objects") && fs::exists(gitRepo / "refs" / "heads") && fs::exists(".mygit/HEAD") && fs::exists(".mygit/index")) {
+    if (fs::exists(gitRepo) && fs::exists(gitRepo / "objects") && fs::exists(gitRepo / "refs" / "heads") && fs::exists(".mygit/HEAD") && fs::exists(".mygit/index") && fs::exists(".mygit/history")) {
         cout << "The repository already exists in " << gitRepo.string() << " ...";
         return;
     }
@@ -25,6 +25,8 @@ void init_command() {
         fs::create_directory(gitRepo);
         fs::create_directories(gitRepo / "objects");
         fs::create_directories(gitRepo / "refs" / "heads");
+        std::ofstream (".mygit/history");
+
         cout << "Creating an empty repository in " << gitRepo.string() << " ...";
 
         std::ofstream headFile(".mygit/HEAD");
@@ -264,6 +266,37 @@ string use_config() {
     buffer << configFile.rdbuf();
     return buffer.str();
 }
+//  +++++++++++++++++++++++++  LOG  +++++++++++++++++++++++++++++++
+
+void update_history(string folderName, string fileName) {
+
+    fs::path objectsPath =  ".mygit/objects";
+    fs::path folderPath = objectsPath / folderName;
+    fs::path filePath = folderPath / fileName;
+
+
+    string content = read_file_content(filePath);
+
+    ofstream file(".mygit/history" , ios::app);
+
+    file << "commit:  " << folderName + fileName << endl << content << endl << endl;
+    
+}
+
+void display_history() {
+
+    fs::path historyPath = ".mygit/history";
+
+    string content = read_file_content(historyPath);
+
+    cout << content;
+    
+
+}
+
+
+
+
 
 
 
@@ -299,6 +332,12 @@ int main (int argc, char* argv[]) {
 
     } else if (args[1] == "log") {
         cout << "Showing the history of files...";
+        cout << "Commiting the files...";
+    } else if (args[1] == "history") {
+
+        display_history();
+        cout << endl << "Showing the history of files...";
+
     } else if (args[1] == "status") {
         cout << "Showing the status...";
     } else {
