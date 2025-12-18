@@ -43,6 +43,8 @@ void init_command() {
 
         std::ofstream indexFile(".mygit/index");
         indexFile.close();
+        std::ofstream configFile(".mygit/config");
+        configFile.close();
 
     } catch (...) {
 
@@ -238,7 +240,30 @@ void add_command(int argc, char* argv[]) {
 
 //  +++++++++++++++++++++++++  CONFIG  ++++++++++++++++++++++++++++
 
+void config_command(int argc, vector<string> args) {
+    ofstream configFile(".mygit/config");
+    if (!configFile.is_open()) {
+        cout << "Error!" << endl;
+        return;
+    }
+    string authorName;
+    for (int i=3; i<args.size(); i++) {
+        if (i>3) {
+            authorName = authorName + " " + args[i];
+        } else {
+            authorName = args[i];
+        }
+    }
+    configFile << authorName;
+    configFile.close();
+}
 
+string use_config() {
+    ifstream configFile(".mygit/config");
+    stringstream buffer;
+    buffer << configFile.rdbuf();
+    return buffer.str();
+}
 
 
 
@@ -265,7 +290,13 @@ int main (int argc, char* argv[]) {
     } else if (args[1] == "commit") {
         cout << "Commiting the files..." << endl << args[2] << endl << args[3];
     } else if (args[1] == "config") {
-        cout << "Commiting the files...";
+
+        if (argc>3 && args[2] == "user.name") {
+            config_command(argc, args);
+        } else {
+            cout << "Error: Type 'user.name' OR type the name!";
+        }
+
     } else if (args[1] == "log") {
         cout << "Showing the history of files...";
     } else if (args[1] == "status") {
