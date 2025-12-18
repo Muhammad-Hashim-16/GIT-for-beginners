@@ -1,0 +1,30 @@
+Your Practice Task
+
+To do:
+
+I want you to write a program that:
+
+Creates a file named secret.txt manually (write "Hello World" inside it).
+
+Uses your new code to read it.
+
+Prints the content to the console.
+
+Can you combine the read_file_content function with a main function to test this?
+
+_____________ Logic for LOG _____________
+
+1- Make History file in INIT stage.
+2- Declare a function that appends the content of every commit file in the end of History File.
+(Access the hash (name) of that commit file from the 'ref/heads' file)
+3- Call this function in every commit function call.
+4- Print the content of History File when the user runs LOG command --> Another function declaration.
+
+_____________ Logic for Config _____________
+
+1- Make a Config file in INIT stage.
+2- Declare a function that takes the name from the Terminal and saves it in Config file.
+3- This functon should return the string containing the name.
+4- Use this function while making the commit file.
+ 
+
