@@ -135,7 +135,7 @@ void commit()
         string commit_hash = saveContent(commit_content); 
         ofstream printerHead(main_file);   // overwrite the parent commit
         if (!printerHead.is_open()) {
-            cout << "Error: Could not main file" << endl;
+            cout << "Error: Could not open main file" << endl;
             return;
         }
         printerHead << commit_hash;        // write the latest commit hash
