@@ -1,0 +1,17 @@
+Adding to the ENVIRONMENT VARIABLES
+
+To use our Version Control System, you need to add the bhm.exe file from the folder to a subfolder made in the C folder and then add the path of that subfolder in the environment variables.
+
+STEPS:
+
+1- Make any folder in 'C'. Let's say Mygit.
+
+2- Copy and paste the bhm.exe file into that folder.
+
+3- Open Environment Variables, then double click on "Path" option you see inside the first block.
+
+4- Then click new and copy paste the path of that folder (e.g "C:\Mygit" if you're using windows.)
+
+5- Then click Ok and then Ok and then Ok.
+
+6- Now just write "bhm help" to see the commands in your terminal.
