@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <filesystem>
 #include <vector>
 #include <string>
@@ -44,11 +45,15 @@ int main (int argc, char* argv[]) {
 
     } else if (args[1] == "help") {
         
-        // Missing!
+        help_command();
 
     } else if (args[1] == "history") {
 
         display_history();
+
+    }  else if (args[1] == "undo") {
+
+        revert_command();
 
     } else {
         cout << "Invalid command!" << endl;

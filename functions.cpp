@@ -12,80 +12,6 @@
 using namespace std;
 namespace fs = std::filesystem;
 
-
-
-string read_file_content(fs::path filename) {
-    ifstream file(filename);
-    if (!file.is_open()) {
-        return "";
-    }
-    stringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
-}
-
-vector<vector<string>> index_to_vector() {
-    vector<vector<string>> indexTableVector;
-    ifstream indexFile (".mygit/index");
-    string line;
-
-    while (std::getline(indexFile, line)) {
-        if (line.empty()) continue;
-        stringstream ss(line);
-        vector<string> row;
-        string rowSegment;
-        while (ss >> rowSegment) {
-            row.push_back(rowSegment);
-        }
-        indexTableVector.push_back(row);
-    }
-    return indexTableVector;
-}
-
-void vector_to_index(vector<vector<string>> indexTableVector) {
-    fs:: path indexPath = ".mygit/index";
-    ofstream indexFile(indexPath, ios::trunc);
-    if (!indexFile.is_open()) {
-        cerr << "ERROR! Couldn't open index file";
-        return;
-    }
-    for (int i=0; i<indexTableVector.size(); i++) {
-        indexFile << indexTableVector[i][0] << " " << indexTableVector[i][1] << endl;
-    }
-}
-
-void config_command(int argc, vector<string> args) {
-    ofstream configFile(".mygit/config");
-    if (!configFile.is_open()) {
-        cout << "Error!" << endl;
-        return;
-    }
-    string authorName;
-    for (int i=3; i<args.size(); i++) {
-        if (i>3) {
-            authorName = authorName + " " + args[i];
-        } else {
-            authorName = args[i];
-        }
-    }
-    configFile << authorName;
-    configFile.close();
-}
-
-string get_time_string() {
-    time_t get_time = time(0);
-    char buf[80];  
-    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&get_time));
-    return string(buf);
-}
-
-string use_config() {
-    ifstream configFile(".mygit/config");
-    stringstream buffer;
-    buffer << configFile.rdbuf();
-    return buffer.str();
-}
-
 //  +++++++++++++++++++++++++  INIT  ++++++++++++++++++++++++++++
 
 void init_command() {
@@ -174,6 +100,46 @@ void create_blob_file(string stringHash, string content) {
     }
     blobFile << content;
     blobFile.close();
+}
+
+string read_file_content(fs::path filename) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        return "";
+    }
+    stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+vector<vector<string>> index_to_vector() {
+    vector<vector<string>> indexTableVector;
+    ifstream indexFile (".mygit/index");
+    string line;
+
+    while (std::getline(indexFile, line)) {
+        if (line.empty()) continue;
+        stringstream ss(line);
+        vector<string> row;
+        string rowSegment;
+        while (ss >> rowSegment) {
+            row.push_back(rowSegment);
+        }
+        indexTableVector.push_back(row);
+    }
+    return indexTableVector;
+}
+
+void vector_to_index(vector<vector<string>> indexTableVector) {
+    fs:: path indexPath = ".mygit/index";
+    ofstream indexFile(indexPath, ios::trunc);
+    if (!indexFile.is_open()) {
+        cerr << "ERROR! Couldn't open index file";
+        return;
+    }
+    for (int i=0; i<indexTableVector.size(); i++) {
+        indexFile << indexTableVector[i][0] << " " << indexTableVector[i][1] << endl;
+    }
 }
 
 bool check_for_repo() {
@@ -279,6 +245,31 @@ void add_command(int argc, char* argv[]) {
 
 //  +++++++++++++++++++++++++  CONFIG  ++++++++++++++++++++++++++++
 
+void config_command(int argc, vector<string> args) {
+    ofstream configFile(".mygit/config");
+    if (!configFile.is_open()) {
+        cout << "Error!" << endl;
+        return;
+    }
+    string authorName;
+    for (int i=3; i<args.size(); i++) {
+        if (i>3) {
+            authorName = authorName + " " + args[i];
+        } else {
+            authorName = args[i];
+        }
+    }
+    configFile << authorName;
+    configFile.close();
+}
+
+string use_config() {
+    ifstream configFile(".mygit/config");
+    stringstream buffer;
+    buffer << configFile.rdbuf();
+    return buffer.str();
+}
+
 //  +++++++++++++++++++++++++  LOG  +++++++++++++++++++++++++++++++
 
 void update_history(string folderName, string fileName) {
@@ -344,6 +335,13 @@ string save_content(const string& content) {
 
 }
 
+string get_time_string() {
+    time_t get_time = time(0);
+    char buf[80];  
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&get_time));
+    return string(buf);
+}
+
 void commit_command() {
 
     fs:: path gitRepo = fs::current_path() / ".mygit"; // checks for the ./git folder
@@ -406,10 +404,145 @@ void commit_command() {
         }
         printerHead << commit_hash;        // write the latest commit hash
         printerHead.close(); 
-    ofstream ofs(".mygit/index", ios::trunc); // Clear the index file 
-    ofs.close(); 
+    // ofstream ofs(".mygit/index", ios::trunc); // Clear the index file 
+    // ofs.close(); 
 
     string folderName = commit_hash.substr(0,2); 
     string fileName = commit_hash.substr(2);
     update_history(folderName, fileName); 
+}
+
+//  +++++++++++++++++++++++++  REVERT  +++++++++++++++++++++++++++++++
+
+void delete_files(vector<vector<string>> treeTableVector) {
+
+    for (auto it = fs::recursive_directory_iterator("."); it != fs::recursive_directory_iterator(); ) {
+
+        string name = it->path().filename().string();
+
+                if (name == ".mygit" || name == ".git") {
+                    it.disable_recursion_pending(); 
+                    ++it;
+                    continue; 
+                }
+
+                if (fs::is_regular_file(it->path())) {
+                    fs::remove(it->path());
+                }
+                 ++it;
+    }
+
+}
+
+string find_tree_hash()  {
+
+    fs::path mainFile = ".mygit/refs/heads/main";
+    ifstream mainFileContent(mainFile);
+    stringstream ss;
+    ss << mainFileContent.rdbuf();
+    string commitHash = ss.str();
+    
+    string commitFolderName = commitHash.substr(0,2); 
+    string commitFileName = commitHash.substr(2);
+
+    fs::path parentPath = ".mygit/objects";
+    fs::path commitFolderPath = parentPath / commitFolderName;
+    fs::path commitFilePath = commitFolderPath / commitFileName;
+
+    ifstream commitObject(commitFilePath);
+    string row;
+    std::getline(commitObject, row);
+    
+    string treeHash = row.substr(6);
+
+    return treeHash;
+
+}
+
+vector<vector<string>> tree_to_vector(string treeHash) {
+
+    string treeFolderName = treeHash.substr(0,2); 
+    string treeFileName = treeHash.substr(2);
+
+    fs::path parentPath = ".mygit/objects";
+    fs::path treeFolderPath = parentPath / treeFolderName;
+    fs::path treeFilePath = treeFolderPath / treeFileName;
+
+
+    vector<vector<string>> treeTableVector;
+    ifstream treeFile (treeFilePath);
+    string line;
+
+    while (std::getline(treeFile, line)) {
+        if (line.empty()) continue;
+        stringstream ss(line);
+        vector<string> row;
+        string rowSegment;
+        while (ss >> rowSegment) {
+            row.push_back(rowSegment);
+        }
+        treeTableVector.push_back(row);
+    }
+    return treeTableVector;
+}
+
+void create_files_again(vector<vector<string>> treeTableVector) {
+
+    for (int i=0; i<treeTableVector.size(); i++) {
+
+        fs::path fileName = treeTableVector[i][0];
+        string blobHash = treeTableVector[i][1];
+
+        string blobFolderName = blobHash.substr(0,2); 
+        string blobFileName = blobHash.substr(2);
+
+        fs::path parentPath = ".mygit/objects";
+        fs::path blobFolderPath = parentPath / blobFolderName;
+        fs::path blobFilePath = blobFolderPath / blobFileName;
+        fs::path newFilePath = "." / fileName;
+
+        ofstream newFile(newFilePath);
+        if (!newFile.is_open()) {
+            cout << "Error! Couldn't create the file" << newFilePath << endl;
+            return;
+        }
+        newFile << read_file_content(blobFilePath);
+        newFile.close();
+        
+    }
+
+}
+
+void revert_command() {
+
+    // Find hash of that tree file (1st go to the latest commit then find the hash of tree)
+
+    string treeHash = find_tree_hash();
+
+    // Get the 2d string vector of tree file
+
+    vector<vector<string>> treeTableVector;
+
+    treeTableVector = tree_to_vector(treeHash);
+
+    // Delete previous files
+
+    delete_files(treeTableVector);
+
+    // Read the content from the hash wali file & Make a file of that exact name and write the content there
+
+    create_files_again(treeTableVector);
+
+}
+
+//  +++++++++++++++++++++++++  HELP  +++++++++++++++++++++++++++++++
+
+void help_command() {
+    cout << "\n          AVAILABLE COMMANDS\n\n";
+    cout << left << setw(10) << "add: "    << "Add File Contents to the Index." << endl;
+    cout << left << setw(10) << "create: " << "Create an Empty New Repository." << endl;
+    cout << left << setw(10) << "history: " << "Show Previous Commits." << endl;
+    cout << left << setw(10) << "save: "   << "Save Changes to the Repository." << endl;
+    cout << left << setw(10) << "set: "    << "List the Username." << endl;
+    cout << left << setw(10) << "undo: "   << "Return to the Previous Commit." << endl << endl;
 }

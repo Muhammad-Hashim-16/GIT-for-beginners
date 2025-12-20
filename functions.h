@@ -5,29 +5,40 @@
 #include <vector>
 #include <filesystem>
 
-// --- Main Commands (Called by main.cpp) ---
-
+// +++++++++++++++++++++++++ INIT ++++++++++++++++++++++++++++
 void init_command();
 
+// +++++++++++++++++++++++++ ADD +++++++++++++++++++++++++++++
+std::string get_hash(std::string content);
+void create_blob_file(std::string stringHash, std::string content);
+std::string read_file_content(std::filesystem::path filename);
+std::vector<std::vector<std::string>> index_to_vector();
+void vector_to_index(std::vector<std::vector<std::string>> indexTableVector);
+bool check_for_repo();
 void add_command(int argc, char* argv[]);
 
+// +++++++++++++++++++++++++ CONFIG ++++++++++++++++++++++++++++
 void config_command(int argc, std::vector<std::string> args);
+std::string use_config();
 
-void commit_command();
-
+// +++++++++++++++++++++++++ LOG +++++++++++++++++++++++++++++++
+void update_history(std::string folderName, std::string fileName);
 void display_history();
 
-
-// --- Helper Functions (Used internally) ---
-
-std::string get_hash(std::string content);
-
-void create_blob_file(std::string stringHash, std::string content);
-
-void update_history(std::string folderName, std::string fileName);
-
-bool check_for_repo();
+// +++++++++++++++++++++++++ COMMIT ++++++++++++++++++++++++++++
 std::string read_file(const std::string& filename);
+std::string save_content(const std::string& content);
 std::string get_time_string();
+void commit_command();
+
+// +++++++++++++++++++++++++ REVERT ++++++++++++++++++++++++++++
+void delete_files();
+std::string find_tree_hash();
+std::vector<std::vector<std::string>> tree_to_vector(std::string treeHash);
+void create_files_again(std::vector<std::vector<std::string>> treeTableVector);
+void revert_command();
+
+// +++++++++++++++++++++++++ HELP ++++++++++++++++++++++++++++++
+void help_command();
 
 #endif
