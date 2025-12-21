@@ -1,3 +1,5 @@
+// Header files and libraries
+
 #include <iostream>
 #include <iomanip>
 #include <filesystem>
@@ -11,9 +13,12 @@
 using namespace std;
 namespace fs = std::filesystem;
 
+// Command line arguments -->
+
 int main (int argc, char* argv[]) {
 
-    vector<string> args;
+    vector<string> args;  // Making a vector string of the char array
+
     for (int i=0; i<argc; i++) {
         args.push_back(argv[i]);
     }
@@ -22,6 +27,8 @@ int main (int argc, char* argv[]) {
         cout << "Compiled successfully!";
         return 1;
     }
+
+    // Checking for each command
 
     if (args[1] == "create") {
         

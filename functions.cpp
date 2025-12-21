@@ -1,6 +1,7 @@
 // Header File for declaring fucntions
 
 #include <iostream>
+#include <iomanip>
 #include <filesystem>
 #include <vector>
 #include <string>
@@ -18,12 +19,18 @@ void init_command() {
     
     fs::path gitRepo = fs::current_path() / ".mygit";
 
+    // Checking if the repo already exists
+
     if (fs::exists(gitRepo) && fs::exists(gitRepo / "objects") && fs::exists(gitRepo / "refs" / "heads") && fs::exists(".mygit/HEAD") && fs::exists(".mygit/index") && fs::exists(".mygit/history")) {
         cout << "The repository already exists in " << gitRepo.string() << " ...";
         return;
     }
 
+    // Catching if there is any error in opening the file
+
     try {
+
+        // Defining the directiories
 
         fs::create_directory(gitRepo);
         fs::create_directories(gitRepo / "objects");
@@ -31,6 +38,8 @@ void init_command() {
         std::ofstream (".mygit/history");
 
         cout << "Creating an empty repository in " << gitRepo.string() << " ...";
+
+        // Creating the files
 
         std::ofstream headFile(".mygit/HEAD");
 
@@ -82,6 +91,8 @@ string get_hash(string content) {
 
 void create_blob_file(string stringHash, string content) {
 
+    // String slicing for the folder name and file name
+
     string folderName = stringHash.substr(0,2);
     string blobFilename = stringHash.substr(2);
 
@@ -93,6 +104,8 @@ void create_blob_file(string stringHash, string content) {
         fs::create_directories(targetDirectory);
     }
 
+    // Creating the blob file
+
     std::ofstream blobFile(targetFile);
     if (!blobFile.is_open()) {
         cout << "Error! Couldn't create the file" << blobFilename << endl;
@@ -103,6 +116,9 @@ void create_blob_file(string stringHash, string content) {
 }
 
 string read_file_content(fs::path filename) {
+
+    // Getting the string of file content
+
     ifstream file(filename);
     if (!file.is_open()) {
         return "";
@@ -117,6 +133,8 @@ vector<vector<string>> index_to_vector() {
     ifstream indexFile (".mygit/index");
     string line;
 
+    // Breaking the file content into lines on the basis of ENTER and then on SPACEBARS
+
     while (std::getline(indexFile, line)) {
         if (line.empty()) continue;
         stringstream ss(line);
@@ -127,10 +145,14 @@ vector<vector<string>> index_to_vector() {
         }
         indexTableVector.push_back(row);
     }
+    // Return the 2d string vector
     return indexTableVector;
 }
 
 void vector_to_index(vector<vector<string>> indexTableVector) {
+
+    // Make index file from the vector
+
     fs:: path indexPath = ".mygit/index";
     ofstream indexFile(indexPath, ios::trunc);
     if (!indexFile.is_open()) {
@@ -143,6 +165,9 @@ void vector_to_index(vector<vector<string>> indexTableVector) {
 }
 
 bool check_for_repo() {
+
+    // Checking if the repo doesn't exist
+
     return fs::exists(".mygit") && fs::exists(".mygit/HEAD");
 }
 
@@ -251,6 +276,9 @@ void config_command(int argc, vector<string> args) {
         cout << "Error!" << endl;
         return;
     }
+
+    // Give the author name to the config file
+
     string authorName;
     for (int i=3; i<args.size(); i++) {
         if (i>3) {
@@ -264,6 +292,9 @@ void config_command(int argc, vector<string> args) {
 }
 
 string use_config() {
+
+    // Use this name in every commit
+
     ifstream configFile(".mygit/config");
     stringstream buffer;
     buffer << configFile.rdbuf();
@@ -278,6 +309,7 @@ void update_history(string folderName, string fileName) {
     fs::path folderPath = objectsPath / folderName;
     fs::path filePath = folderPath / fileName;
 
+    // Add the content of commit to history file
 
     string content = read_file_content(filePath);
 
@@ -289,13 +321,14 @@ void update_history(string folderName, string fileName) {
 
 void display_history() {
 
+    // Display the history whenever wanted
+
     fs::path historyPath = ".mygit/history";
 
     string content = read_file_content(historyPath);
 
     cout << content;
     
-
 }
 
 //  +++++++++++++++++++++++++  COMMIT  +++++++++++++++++++++++++++++++
@@ -404,8 +437,6 @@ void commit_command() {
         }
         printerHead << commit_hash;        // write the latest commit hash
         printerHead.close(); 
-    // ofstream ofs(".mygit/index", ios::trunc); // Clear the index file 
-    // ofs.close(); 
 
     string folderName = commit_hash.substr(0,2); 
     string fileName = commit_hash.substr(2);
@@ -416,15 +447,21 @@ void commit_command() {
 
 void delete_files(vector<vector<string>> treeTableVector) {
 
+    // Run a loop and get the file name
+
     for (auto it = fs::recursive_directory_iterator("."); it != fs::recursive_directory_iterator(); ) {
 
         string name = it->path().filename().string();
+
+                // Ignore the git repos
 
                 if (name == ".mygit" || name == ".git") {
                     it.disable_recursion_pending(); 
                     ++it;
                     continue; 
                 }
+
+                // Delete rest of the files
 
                 if (fs::is_regular_file(it->path())) {
                     fs::remove(it->path());
@@ -436,6 +473,8 @@ void delete_files(vector<vector<string>> treeTableVector) {
 
 string find_tree_hash()  {
 
+    //  Read the main file and get the hash of the latest commit
+
     fs::path mainFile = ".mygit/refs/heads/main";
     ifstream mainFileContent(mainFile);
     stringstream ss;
@@ -445,6 +484,8 @@ string find_tree_hash()  {
     string commitFolderName = commitHash.substr(0,2); 
     string commitFileName = commitHash.substr(2);
 
+    // Go to that specific commit file
+
     fs::path parentPath = ".mygit/objects";
     fs::path commitFolderPath = parentPath / commitFolderName;
     fs::path commitFilePath = commitFolderPath / commitFileName;
@@ -452,6 +493,8 @@ string find_tree_hash()  {
     ifstream commitObject(commitFilePath);
     string row;
     std::getline(commitObject, row);
+
+    // Get the hash of tree file
     
     string treeHash = row.substr(6);
 
@@ -460,6 +503,8 @@ string find_tree_hash()  {
 }
 
 vector<vector<string>> tree_to_vector(string treeHash) {
+
+    // Making the 2d string vector of tree file
 
     string treeFolderName = treeHash.substr(0,2); 
     string treeFileName = treeHash.substr(2);
@@ -483,10 +528,15 @@ vector<vector<string>> tree_to_vector(string treeHash) {
         }
         treeTableVector.push_back(row);
     }
+
+    // Return the vector
+
     return treeTableVector;
 }
 
 void create_files_again(vector<vector<string>> treeTableVector) {
+
+    // Run the loop for all files
 
     for (int i=0; i<treeTableVector.size(); i++) {
 
@@ -500,6 +550,8 @@ void create_files_again(vector<vector<string>> treeTableVector) {
         fs::path blobFolderPath = parentPath / blobFolderName;
         fs::path blobFilePath = blobFolderPath / blobFileName;
         fs::path newFilePath = "." / fileName;
+
+        // Creating each file from scratch
 
         ofstream newFile(newFilePath);
         if (!newFile.is_open()) {
