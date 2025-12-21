@@ -177,7 +177,7 @@ void add_command(int argc, char* argv[]) {
 
     if (!check_for_repo()) {
         cout << "Error: Not a git repository!" << endl;
-        cout << "Try running './main' first!" << endl;
+        cout << "Try running 'bhm create' first!" << endl;
         return;
     }
 
@@ -447,28 +447,36 @@ void commit_command() {
 
 void delete_files(vector<vector<string>> treeTableVector) {
 
-    // Run a loop and get the file name
+    auto it = fs::recursive_directory_iterator(".");
+    auto end = fs::recursive_directory_iterator();
 
-    for (auto it = fs::recursive_directory_iterator("."); it != fs::recursive_directory_iterator(); ) {
+    while (it != end) {
+        
+        fs::path currentPath = it->path();
+        string name = currentPath.filename().string();
 
-        string name = it->path().filename().string();
+        if (name == ".mygit" || name == ".git") {
+            it.disable_recursion_pending(); // Advance form of continue
+            ++it; 
+            continue; 
+        }
 
-                // Ignore the git repos
+        // Check if the current file exists in tree file
+        bool shouldDelete = false;
+        for (int i = 0; i < treeTableVector.size(); i++) {
+            if (name == treeTableVector[i][0]) { 
+                shouldDelete = true;
+                break; // We found it, no need to keep checking the vector
+            }
+        }
 
-                if (name == ".mygit" || name == ".git") {
-                    it.disable_recursion_pending(); 
-                    ++it;
-                    continue; 
-                }
+        // Delete the file if flag says YESS!
+        if (shouldDelete && fs::is_regular_file(currentPath)) {
+            fs::remove(currentPath);
+        }
 
-                // Delete rest of the files
-
-                if (fs::is_regular_file(it->path())) {
-                    fs::remove(it->path());
-                }
-                 ++it;
+        ++it;
     }
-
 }
 
 string find_tree_hash()  {
@@ -590,11 +598,11 @@ void revert_command() {
 //  +++++++++++++++++++++++++  HELP  +++++++++++++++++++++++++++++++
 
 void help_command() {
-    cout << "\n          AVAILABLE COMMANDS\n\n";
-    cout << left << setw(10) << "add: "    << "Add File Contents to the Index." << endl;
+    cout << "\n         HELP COMMAND MENU\n\n";
     cout << left << setw(10) << "create: " << "Create an Empty New Repository." << endl;
-    cout << left << setw(10) << "history: " << "Show Previous Commits." << endl;
+    cout << left << setw(10) << "add: "    << "Add File Contents to the Index." << endl;
     cout << left << setw(10) << "save: "   << "Save Changes to the Repository." << endl;
     cout << left << setw(10) << "set: "    << "List the Username." << endl;
+    cout << left << setw(10) << "history: " << "Show Previous Commits." << endl;
     cout << left << setw(10) << "undo: "   << "Return to the Previous Commit." << endl << endl;
 }
