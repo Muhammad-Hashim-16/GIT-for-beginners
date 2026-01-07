@@ -500,14 +500,42 @@ string find_tree_hash()  {
 
     ifstream commitObject(commitFilePath);
     string row;
-    std::getline(commitObject, row);
+    string parentRow, parentCommit;
+    getline(commitObject, row); // Just here to move cursor to next line
+    getline(commitObject, parentRow);
 
-    // Get the hash of tree file
+    // Find the PARENT commit to update refs/heads/main
+
+    if(parentRow.substr(0,6) == "Parent") {
+        parentCommit = parentRow.substr(8);
+    }
     
-    string treeHash = row.substr(6);
+    commitObject.close();
 
-    return treeHash;
+    if (!parentCommit.empty()) {
+        ofstream printerHead(mainFile);
+        printerHead << parentCommit;
+        printerHead.close();
+    }   
+    else {
+        cerr << "Error: Cannot go back, this is the first commit!" << endl;
+    }
 
+    // Get the hash of tree file from the PARENT commit
+
+    string parentFolder = parentCommit.substr(0, 2);
+    string parentFile = parentCommit.substr(2);
+    fs::path parentCommitPath = fs::path(".mygit/objects") / parentFolder / parentFile;
+
+    ifstream parentObject(parentCommitPath);
+    string parentTreeRow;
+    getline(parentObject, parentTreeRow);
+    parentObject.close();
+
+    // Return the PARENT tree hash
+
+    return parentTreeRow.substr(6);
+    
 }
 
 vector<vector<string>> tree_to_vector(string treeHash) {
@@ -526,7 +554,7 @@ vector<vector<string>> tree_to_vector(string treeHash) {
     ifstream treeFile (treeFilePath);
     string line;
 
-    while (std::getline(treeFile, line)) {
+    while (getline(treeFile, line)) {
         if (line.empty()) continue;
         stringstream ss(line);
         vector<string> row;
