@@ -214,7 +214,7 @@ void add_command(int argc, char* argv[]) {
     // Check if that file exists or not
 
         if (!fs::exists(filename)) {
-            cout << filename << " doesn't exists! Adding other files..." << endl;
+            cout << filename << " doesn't exist! Adding other files..." << endl;
             continue;
         }
 
@@ -265,6 +265,59 @@ void add_command(int argc, char* argv[]) {
     vector_to_index(indexTableVector);
 
     cout << "All files added successfully!";
+
+}
+
+void add_all_command() {
+
+    vector<vector<string>> indexTableVector = index_to_vector();
+
+    bool indexChanged = false;
+
+    for (const auto& entry : fs::directory_iterator(".")) {
+
+        if (!fs::is_regular_file(entry.path())) continue;
+
+        fs::path filePath = entry.path();
+        string filenameString = filePath.string();
+
+        if (filenameString == "bhm" || filenameString == "bhm.exe") continue;
+
+        string content = read_file_content(filePath);
+        string hash = get_hash(content);
+        create_blob_file(hash, content);
+
+        bool found = false;
+
+        for (int row=0; row<indexTableVector.size(); row++) {
+            if (filenameString == indexTableVector[row][0]) {
+                found = true; 
+
+                string existingHash = indexTableVector[row][1];
+                
+                if (existingHash == hash) {
+                    cout << filenameString << " : No changes detected. Skipping..." << endl;
+                } 
+                else {
+                    cout << filenameString << " : File changed. Updating index." << endl;
+                    indexTableVector[row][1] = hash;
+                }
+                
+                break;
+            }
+        }
+
+        if (!found) {
+            cout << "Adding new file: " << filenameString << endl;
+            vector<string> newRow;
+            newRow.push_back(filenameString);
+            newRow.push_back(hash);
+            indexTableVector.push_back(newRow);
+        }
+
+    }
+
+    vector_to_index(indexTableVector);
 
 }
 
@@ -626,7 +679,7 @@ void revert_command() {
 //  +++++++++++++++++++++++++  HELP  +++++++++++++++++++++++++++++++
 
 void help_command() {
-    cout << "\n         HELP COMMAND MENU\n\n";
+    cout << "\n      -->HELP COMMAND MENU\n\n";
     cout << left << setw(10) << "create: " << "Create an Empty New Repository." << endl;
     cout << left << setw(10) << "add: "    << "Add File Contents to the Index." << endl;
     cout << left << setw(10) << "save: "   << "Save Changes to the Repository." << endl;

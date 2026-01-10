@@ -38,7 +38,11 @@ int main (int argc, char* argv[]) {
 
     } else if (args[1] == "add") {
 
-        add_command(argc, argv);
+        if (argc>2 && args[2] == ".") {
+            add_all_command();
+        } else {
+            add_command(argc, argv);
+        }
 
     } else if (args[1] == "save") {
 
