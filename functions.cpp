@@ -171,7 +171,7 @@ bool check_for_repo() {
     return fs::exists(".mygit") && fs::exists(".mygit/HEAD");
 }
 
-void add_command(int argc, char* argv[]) {
+void add_command(int argc, vector<string> args) {
 
 // Check if the repo is already initialized or not?
 
@@ -179,13 +179,6 @@ void add_command(int argc, char* argv[]) {
         cout << "Error: Not a git repository!" << endl;
         cout << "Try running 'bhm create' first!" << endl;
         return;
-    }
-
-// Convert char array into string vector
-
-    vector<string> args;
-    for (int i=0; i<argc; i++) {
-        args.push_back(argv[i]);
     }
 
 // If no file given
@@ -443,43 +436,55 @@ void commit_command() {
     update_history(folderName, fileName); 
 }
 
-//  +++++++++++++++++++++++++  REVERT  +++++++++++++++++++++++++++++++
+//  +++++++++++++++++++++++++  RESET +++++++++++++++++++++++++++++++
 
 void delete_files(vector<vector<string>> treeTableVector) {
 
-    auto it = fs::recursive_directory_iterator(".");
-    auto end = fs::recursive_directory_iterator();
+    vector<vector<string>> indexTableVector = index_to_vector();
+    bool shouldKeep = false;
+    string fileName;
 
-    while (it != end) {
-        
-        fs::path currentPath = it->path();
-        string name = currentPath.filename().string();
+    // Check if the current file EXISTS in tree file
 
-        if (name == ".mygit" || name == ".git") {
-            it.disable_recursion_pending(); // Advance form of continue
-            ++it; 
-            continue; 
-        }
+    for(int i=0; i<indexTableVector.size(); i++) {
+        fileName = indexTableVector[i][0];
+        shouldKeep = false;
 
-        // Check if the current file exists in tree file
-        bool shouldDelete = false;
-        for (int i = 0; i < treeTableVector.size(); i++) {
-            if (name == treeTableVector[i][0]) { 
-                shouldDelete = true;
-                break; // We found it, no need to keep checking the vector
+        for(int j=0; j<treeTableVector.size(); j++) {
+
+            if(fileName == treeTableVector[j][0]) {
+                shouldKeep = true;
+                break;
             }
         }
 
-        // Delete the file if flag says YESS!
-        if (shouldDelete && fs::is_regular_file(currentPath)) {
-            fs::remove(currentPath);
-        }
+        // If file does NOT EXIST in tree file DELETE it
 
-        ++it;
+        if(!shouldKeep) {
+            fs::path filePath = fileName;
+
+            if(exists(filePath)) {
+                remove(filePath);
+            }
+        }
     }
+    
 }
 
-string find_tree_hash()  {
+void update_main(string parentCommit, fs::path mainFile) {
+    
+    if (!parentCommit.empty()) {
+        ofstream printerHead(mainFile);
+        printerHead << parentCommit;
+        printerHead.close();
+    }   
+    else {
+        return;
+    }
+
+}
+
+string find_tree_hash(vector<string> args)  {
 
     //  Read the main file and get the hash of the latest commit
 
@@ -503,22 +508,22 @@ string find_tree_hash()  {
     string parentRow, parentCommit;
     getline(commitObject, row); // Just here to move cursor to next line
     getline(commitObject, parentRow);
+    commitObject.close();
 
-    // Find the PARENT commit to update refs/heads/main
+    // Find the PARENT commit 
 
     if(parentRow.substr(0,6) == "Parent") {
         parentCommit = parentRow.substr(8);
     }
-    
-    commitObject.close();
 
-    if (!parentCommit.empty()) {
-        ofstream printerHead(mainFile);
-        printerHead << parentCommit;
-        printerHead.close();
-    }   
-    else {
+    // update refs/heads/main only when UNDO "RESET" is called
+
+    if(args[1] == "undo") {
+        update_main(parentCommit, mainFile);
+    }
+    if(parentCommit.empty()) {
         cerr << "Error: Cannot go back, this is the first commit!" << endl;
+        return "";
     }
 
     // Get the hash of tree file from the PARENT commit
@@ -601,11 +606,11 @@ void create_files_again(vector<vector<string>> treeTableVector) {
 
 }
 
-void revert_command() {
+void reset_command(vector<string> args) {
 
     // Find hash of that tree file (1st go to the latest commit then find the hash of tree)
 
-    string treeHash = find_tree_hash();
+    string treeHash = find_tree_hash(args);
 
     // Get the 2d string vector of tree file
 
@@ -613,13 +618,16 @@ void revert_command() {
 
     treeTableVector = tree_to_vector(treeHash);
 
-    // Delete previous files
+    // Delete EXTRA files
 
     delete_files(treeTableVector);
 
     // Read the content from the hash wali file & Make a file of that exact name and write the content there
 
     create_files_again(treeTableVector);
+
+    // Updating the INDEX file
+    vector_to_index(treeTableVector);    
 
 }
 
@@ -632,5 +640,39 @@ void help_command() {
     cout << left << setw(10) << "save: "   << "Save Changes to the Repository." << endl;
     cout << left << setw(10) << "set: "    << "List the Username." << endl;
     cout << left << setw(10) << "history: " << "Show Previous Commits." << endl;
-    cout << left << setw(10) << "undo: "   << "Return to the Previous Commit." << endl << endl;
+    cout << left << setw(10) << "undo: "   << "Return to the Previous Commit Erasing the Current." << endl;
+    cout << left << setw(10) << "revert: "   << "Return to the Previous Commit in the Form of a New Commit." << endl << endl;
+}
+
+//  +++++++++++++++++++++++++ REVERT +++++++++++++++++++++++++++++++
+
+
+void revert_command(vector<string> args) {
+
+    // Find hash of that tree file (1st go to the latest commit then find the hash of tree)
+
+    string treeHash = find_tree_hash(args);
+
+    // Get the 2d string vector of tree file
+
+    vector<vector<string>> treeTableVector;
+
+    treeTableVector = tree_to_vector(treeHash);
+
+    // Delete EXTRA files
+
+    delete_files(treeTableVector);
+
+    // Read the content from the hash wali file & Make a file of that exact name and write the content there
+
+    create_files_again(treeTableVector);
+
+    // Updating the INDEX file because commit uses it
+    
+    vector_to_index(treeTableVector);
+
+    // Make a new commit for revert
+
+    commit_command();
+
 }

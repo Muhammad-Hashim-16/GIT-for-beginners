@@ -15,7 +15,7 @@ std::string read_file_content(std::filesystem::path filename);
 std::vector<std::vector<std::string>> index_to_vector();
 void vector_to_index(std::vector<std::vector<std::string>> indexTableVector);
 bool check_for_repo();
-void add_command(int argc, char* argv[]);
+void add_command(int argc, std::vector<std::string> args);
 
 // +++++++++++++++++++++++++ CONFIG ++++++++++++++++++++++++++++
 void config_command(int argc, std::vector<std::string> args);
@@ -31,14 +31,17 @@ std::string save_content(const std::string& content);
 std::string get_time_string();
 void commit_command();
 
-// +++++++++++++++++++++++++ REVERT ++++++++++++++++++++++++++++
+// +++++++++++++++++++++++++ RESET ++++++++++++++++++++++++++++
 void delete_files();
-std::string find_tree_hash();
+std::string find_tree_hash(std::vector<std::string> args);
 std::vector<std::vector<std::string>> tree_to_vector(std::string treeHash);
 void create_files_again(std::vector<std::vector<std::string>> treeTableVector);
-void revert_command();
+void reset_command(std::vector<std::string> args);
 
 // +++++++++++++++++++++++++ HELP ++++++++++++++++++++++++++++++
 void help_command();
+
+// +++++++++++++++++++++++++ REVERT ++++++++++++++++++++++++++++++
+void revert_command(std::vector<std::string> args);
 
 #endif

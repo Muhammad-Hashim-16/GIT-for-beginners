@@ -38,7 +38,7 @@ int main (int argc, char* argv[]) {
 
     } else if (args[1] == "add") {
 
-        add_command(argc, argv);
+        add_command(argc, args);
 
     } else if (args[1] == "save") {
 
@@ -62,7 +62,12 @@ int main (int argc, char* argv[]) {
 
     }  else if (args[1] == "undo") {
 
-        revert_command();
+       reset_command(args);
+
+    }
+    else if (args[1] == "revert") {
+
+       revert_command(args);
 
     } else {
         cout << "Invalid command!" << endl;
