@@ -16,6 +16,7 @@ std::vector<std::vector<std::string>> index_to_vector();
 void vector_to_index(std::vector<std::vector<std::string>> indexTableVector);
 bool check_for_repo();
 void add_command(int argc, std::vector<std::string> args);
+void add_all_command();
 
 // +++++++++++++++++++++++++ CONFIG ++++++++++++++++++++++++++++
 void config_command(int argc, std::vector<std::string> args);
