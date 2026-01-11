@@ -59,6 +59,8 @@ void init_command() {
         indexFile.close();
         std::ofstream configFile(".mygit/config");
         configFile.close();
+        std::ofstream mainFile(".mygit/refs/heads/main");
+        mainFile.close();
 
     } catch (...) {
 
@@ -349,19 +351,13 @@ string use_config() {
 
 //  +++++++++++++++++++++++++  LOG  +++++++++++++++++++++++++++++++
 
-void update_history(string folderName, string fileName) {
+void update_history(string saveHash, string saveContent) {
 
-    fs::path objectsPath =  ".mygit/objects";
-    fs::path folderPath = objectsPath / folderName;
-    fs::path filePath = folderPath / fileName;
-
-    // Add the content of commit to history file
-
-    string content = read_file_content(filePath);
-
-    ofstream file(".mygit/history" , ios::app);
-
-    file << "commit:  " << folderName + fileName << endl << content << endl << endl;
+    string historyFile = ".mygit/history";
+    ofstream file(historyFile, ios:: app);  
+    file << "Commit: " << saveHash << "\n";
+    file << saveContent << "\n\n";
+    return;
     
 }
 
@@ -379,42 +375,7 @@ void display_history() {
 
 //  +++++++++++++++++++++++++  COMMIT  +++++++++++++++++++++++++++++++
 
-string read_file(const string& filename) {
-    ifstream file(filename);
-    if (!file.is_open()) {
-        return "";          // Return empty if file not found
-    }
-
-    stringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
-}
-
-string save_content(const string& content) {
-
-    string hash = get_hash(content); // hash of index 
-
-    string folderName = hash.substr(0,2); 
-    string fileName = hash.substr(2);
-
-    fs::path objectDirectory = ".mygit/objects";
-    fs::path targetDirectory = objectDirectory / folderName;
-    fs::path targetFile = targetDirectory / fileName; 
-
-    if(!fs::exists(targetDirectory)) { 
-        fs::create_directories(targetDirectory);
-    }
-
-    if(!fs::exists(targetFile)) {
-        ofstream printerHead (targetFile);
-        printerHead << content; // tree object is completed 
-    }
-
-    return hash;
-
-}
-
-string get_time_string() {
+string get_timestamp() {
     time_t get_time = time(0);
     char buf[80];  
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&get_time));
@@ -423,70 +384,99 @@ string get_time_string() {
 
 void commit_command() {
 
-    fs:: path gitRepo = fs::current_path() / ".mygit"; // checks for the ./git folder
-    fs:: path indexFile = ".mygit/index"; // stores address of index file 
-    if ((!fs::exists(gitRepo) || fs::is_empty(indexFile))) // if git folder or indexfile does not exist
+    fs::path indexFile = ".mygit/index";
+    fs::path mainFile = ".mygit/refs/heads/main";
+    fs::path configFile = ".mygit/config";
+    fs::path historyFile = ".mygit/history";
+    if(!check_for_repo()) //if repo does not exist
     {
-        cout << "No change added to the file." << endl;
+        cout << "Error: Not a git repository!" << endl;
+        cout << "Try running 'bhm create' first!" << endl;
+        return;
+    }
+    if(fs::is_empty(indexFile)) // if index file is empty
+    {
+        cout << "No files added to save." << endl;
+        cout << "Use 'bhm add (filename)' before saving." << endl;
         return;
     }
 
-    string content = read_file(indexFile.string());       // returns the content of the index file
-    string tree_hash = save_content(content); // returns the hash of the index file 
-    std::string main_file = ".mygit/refs/heads/main";   // returns the address of the main file that stores the hash of the latest commit
-    fs::path main_file_path = ".mygit/refs/heads/main";
+    string treeContent = read_file_content(indexFile); // string of index file 
+    string treeHash = get_hash(treeContent); // hash of index content 
 
-    if (!fs::exists(main_file_path))    // checks if main file is not empty
+    // Check if there are any changes to commit
+    if(!fs::is_empty(mainFile)) 
     {
-        fs::create_directories(main_file_path.parent_path()); // creates .mygit/refs/heads if missing
-        std::ofstream main_file_stream(main_file_path);
-        if (!main_file_stream.is_open()) {
-            std::cout << "Error: Could not create file at " << main_file_path << std::endl;
-        } 
-        else {
-            main_file_stream << "";
-            main_file_stream.close();
+        
+        string mainContent = read_file_content(mainFile); // hash of last commit 
+        string indexHash;
+        fs::path findCommit = ".mygit/objects/" + mainContent.substr(0,2) + "/" + mainContent.substr(2); // path of last commit object
+        ifstream commitContent(findCommit); 
+        if (!commitContent) {
+        cout << "Error: Commit object not found!" << endl;
+        return;
         }
-
-    }
-        string parent_commit = "";
-        if (!fs::is_empty(main_file_path)) { // if main file is not empty, read the hash of latest commit
-            parent_commit = read_file(main_file);
-        }
-        string committer;
-        committer = use_config();
-        if (committer.empty()) {
-            committer = "   -   ";
-        }
-
-        string message;
-        do {
-            cout << "Enter the commit message: ";
-            getline(cin, message);
-            if (message.empty()) {
-                cout << "Commit message cannot be empty. Please try again.\n";
+        string line;
+        while (getline(commitContent, line))  // parse commit object to extract tree hash
+        { 
+            if(line.find("Tree:") == 0)
+            {
+                indexHash = line.substr(6,45);
+                break;
             }
-        } 
-        while (message.empty());
-
-        string commit_time = get_time_string(); // returns Timestamp
-        string commit_content = "Tree: " + tree_hash + "\n";
-        if (!parent_commit.empty()) { // if any previous commit exists
-            commit_content += "Parent: " + parent_commit + "\n";
         }
-        commit_content += "Author Name: " + committer + "\n" + "Date: " + commit_time + "\n\n" + message;            
-        string commit_hash = save_content(commit_content); 
-        ofstream printerHead(main_file);   // overwrite the parent commit
-        if (!printerHead.is_open()) {
-            cout << "Error: Could not open main file!" << endl;
+        if (indexHash == treeHash) // same tree snapshot as last commit -> nothing new to commit
+        {
+            cout << "No changes to commit!" << endl;
             return;
         }
-        printerHead << commit_hash;        // write the latest commit hash
-        printerHead.close(); 
+    }
+    
+    create_blob_file(treeHash,treeContent); //store tree object
+    //Parent Commit
+    string parentCommit = "   -   ";
+    if(!fs::is_empty(mainFile))
+    {
+        parentCommit = read_file_content(mainFile);
+    }
+    //Timestamp
+    string timeStamp = get_timestamp();
+    //Committer
+    string committer = "   -   ";
+    if(!fs::is_empty(configFile))
+    {
+        committer = read_file_content(configFile);
+    }
+    //Message 
+    string message;
+    do 
+    {
+        cout << "Enter the commit message: ";
+        getline(cin, message);
+        if (message.empty()) 
+        {
+            cout << "Commit message cannot be empty. Please try again.\n";
+        }
+    } 
+    while (message.empty());  
+    
+    //Creating commit
+    string saveContent = "Tree: " + treeHash + "\n"
+                         "Parent Commit: " + parentCommit + "\n"
+                         "Author name: " + committer + "\n"
+                         "Timestamp: " + timeStamp + "\n\n"
+                         + message;                                                                      
 
-    string folderName = commit_hash.substr(0,2); 
-    string fileName = commit_hash.substr(2);
-    update_history(folderName, fileName); 
+                         
+    string saveHash = get_hash(saveContent);
+    //time to create commit object
+    create_blob_file(saveHash,saveContent); //store commit object
+    //updating main
+    ofstream main(mainFile, ios::trunc);
+    main << saveHash;
+    main.close();
+    //updating history
+    update_history(saveHash, saveContent);
 }
 
 //  +++++++++++++++++++++++++  RESET +++++++++++++++++++++++++++++++
