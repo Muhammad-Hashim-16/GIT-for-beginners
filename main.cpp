@@ -1,7 +1,5 @@
 // Header files and libraries
 
-// This will prove now !!!
-
 #include <iostream>
 #include <iomanip>
 #include <filesystem>
@@ -67,11 +65,6 @@ int main (int argc, char* argv[]) {
     }  else if (args[1] == "undo") {
 
        reset_command(args);
-
-    }
-    else if (args[1] == "revert") {
-
-       revert_command(args);
 
     } else {
         cout << "Invalid command!" << endl;

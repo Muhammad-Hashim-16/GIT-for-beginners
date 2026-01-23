@@ -677,18 +677,19 @@ void reset_command(vector<string> args) {
 //  +++++++++++++++++++++++++  HELP  +++++++++++++++++++++++++++++++
 
 void help_command() {
-    cout << "\n      -->HELP COMMAND MENU\n\n";
+    cout << "\n      HELP COMMAND MENU\n\n";
     cout << left << setw(10) << "create: " << "Create an Empty New Repository." << endl;
     cout << left << setw(10) << "add: "    << "Add File Contents to the Index." << endl;
     cout << left << setw(10) << "save: "   << "Save Changes to the Repository." << endl;
     cout << left << setw(10) << "set: "    << "List the Username." << endl;
     cout << left << setw(10) << "history: " << "Show Previous Commits." << endl;
-    cout << left << setw(10) << "undo: "   << "Return to the Previous Commit Erasing the Current." << endl;
-    cout << left << setw(10) << "revert: "   << "Return to the Previous Commit in the Form of a New Commit." << endl << endl;
+    cout << left << setw(10) << "undo: "   << "Return to the Previous Commit Erasing the Current." << endl << endl;
 }
 
-//  +++++++++++++++++++++++++ REVERT +++++++++++++++++++++++++++++++
 
+
+
+//  +++++++++++++++++++++++++ REVERT (not completed yet.) +++++++++++++++++++++++++++++++
 
 void revert_command(vector<string> args) {
 
@@ -719,3 +720,5 @@ void revert_command(vector<string> args) {
     commit_command();
 
 }
+
+// Revert command is not completed yet, we are still working on it. If you want, you can consider to work on it too.
