@@ -265,6 +265,14 @@ void add_command(int argc, vector<string> args) {
 
 void add_all_command() {
 
+    // Check if the repo is already initialized or not?
+
+    if (!check_for_repo()) {
+        cout << "Error: Not a git repository!" << endl;
+        cout << "Try running 'bhm create' first!" << endl;
+        return;
+    }
+    
     vector<vector<string>> indexTableVector = index_to_vector();
 
     bool indexChanged = false;
