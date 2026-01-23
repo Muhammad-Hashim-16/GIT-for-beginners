@@ -272,7 +272,7 @@ void add_all_command() {
         cout << "Try running 'bhm create' first!" << endl;
         return;
     }
-    
+
     vector<vector<string>> indexTableVector = index_to_vector();
 
     bool indexChanged = false;
@@ -564,7 +564,7 @@ string find_tree_hash(vector<string> args)  {
     // Find the PARENT commit 
 
     if(parentRow.substr(0,6) == "Parent") {
-        parentCommit = parentRow.substr(8);
+        parentCommit = parentRow.substr(15);
     }
 
     // update refs/heads/main only when UNDO "RESET" is called
@@ -662,6 +662,8 @@ void reset_command(vector<string> args) {
     // Find hash of that tree file (1st go to the latest commit then find the hash of tree)
 
     string treeHash = find_tree_hash(args);
+
+    if (treeHash == "") return;
 
     // Get the 2d string vector of tree file
 
