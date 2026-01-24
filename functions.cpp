@@ -282,7 +282,7 @@ void add_all_command() {
         if (!fs::is_regular_file(entry.path())) continue;
 
         fs::path filePath = entry.path();
-        string filenameString = filePath.string();
+        string filenameString = filePath.filename().string();
 
         if (filenameString == "bhm" || filenameString == "bhm.exe") continue;
 
