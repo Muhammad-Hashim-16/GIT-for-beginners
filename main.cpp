@@ -24,7 +24,7 @@ int main (int argc, char* argv[]) {
     }
 
     if (argc<2) {
-        cout << "Compiled successfully!";
+        cout << "Compiled successfully!\n";
         return 1;
     }
 
@@ -51,7 +51,7 @@ int main (int argc, char* argv[]) {
         if (argc>3 && args[2] == "user.name") {
             config_command(argc, args);
         } else {
-            cout << "Error: Type 'user.name' OR type the name!";
+            cout << "Error: Type 'user.name' OR type the name!\n";
         }
 
     } else if (args[1] == "help") {
@@ -62,14 +62,26 @@ int main (int argc, char* argv[]) {
 
         display_history();
 
-    }  else if (args[1] == "undo") {
+    } else if (args[1] == "undo") {
 
-       reset_command(args);
+        if (argc>2) {
+
+            if (args[2] == "save") {
+                reset_advanced();
+            } else {
+                cout << "Invalid command!\nTry 'bhm undo save'\n";
+            }
+
+        } else {
+            
+            reset_command();
+
+        }
 
     } else {
-        cout << "Invalid command!" << endl;
-        cout << "Try typing 'bhm help' for Command Help Menu." << endl;
+        cout << "Invalid command!\nTry 'bhm help' for Command Help Menu.\n";
     }
+
     return 0;
 
 }

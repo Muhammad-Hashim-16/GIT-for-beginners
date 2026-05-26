@@ -9,9 +9,54 @@
 #include <sstream>
 #include "sha1.h"
 #include "functions.h"
+#include <cctype>
 
 using namespace std;
 namespace fs = std::filesystem;
+
+string base64_encode(const string& input) {
+    static const char* base64_chars = 
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    
+    string encoded;
+    int val = 0, valb = 0;
+    
+    for (unsigned char c : input) {
+        val = (val << 8) + c;
+        valb += 8;
+        while (valb >= 6) {
+            valb -= 6;
+            encoded.push_back(base64_chars[(val >> valb) & 0x3F]);
+        }
+    }
+    
+    if (valb > 0) encoded.push_back(base64_chars[(val << (6 - valb)) & 0x3F]);
+    while (encoded.size() % 4) encoded.push_back('=');
+    
+    return encoded;
+}
+
+string base64_decode(const string& encoded) {
+    static const string base64_chars = 
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    
+    string decoded;
+    vector<int> T(256, -1);
+    for (int i = 0; i < 64; i++) T[base64_chars[i]] = i;
+    
+    int val = 0, valb = 0;
+    for (unsigned char c : encoded) {
+        if (T[c] == -1) break;
+        val = (val << 6) + T[c];
+        valb += 6;
+        if (valb >= 8) {
+            valb -= 8;
+            decoded.push_back(char((val >> valb) & 0xFF));
+        }
+    }
+    
+    return decoded;
+}
 
 //  +++++++++++++++++++++++++  INIT  ++++++++++++++++++++++++++++
 
@@ -108,12 +153,18 @@ void create_blob_file(string stringHash, string content) {
 
     // Creating the blob file
 
-    std::ofstream blobFile(targetFile);
+    std::ofstream blobFile(targetFile, ios::binary);
     if (!blobFile.is_open()) {
         cout << "Error! Couldn't create the file" << blobFilename << endl;
         return ;
     }
-    blobFile << content;
+
+    if (content.substr(0, 7) == "BINARY:") {
+        blobFile << base64_decode(content.substr(7));
+    } else {
+        blobFile << content;
+    }
+
     blobFile.close();
 }
 
@@ -121,13 +172,15 @@ string read_file_content(fs::path filename) {
 
     // Getting the string of file content
 
-    ifstream file(filename);
+    ifstream file(filename, ios::binary);
     if (!file.is_open()) {
         return "";
     }
     stringstream buffer;
     buffer << file.rdbuf();
-    return buffer.str();
+    string content = buffer.str();
+
+    return "BINARY:" + base64_encode(content);
 }
 
 vector<vector<string>> index_to_vector() {
@@ -282,7 +335,7 @@ void add_all_command() {
         if (!fs::is_regular_file(entry.path())) continue;
 
         fs::path filePath = entry.path();
-        string filenameString = filePath.string();
+        string filenameString = filePath.filename().string();
 
         if (filenameString == "bhm" || filenameString == "bhm.exe") continue;
 
@@ -405,9 +458,20 @@ void commit_command() {
     if(fs::is_empty(indexFile)) // if index file is empty
     {
         cout << "No files added to save." << endl;
-        cout << "Use 'bhm add (filename)' before saving." << endl;
+        cout << "Use 'bhm add <filename>' before saving." << endl;
         return;
     }
+
+    vector<vector<string>> indexTableVector = index_to_vector();
+    vector<vector<string>> cleanedIndex;
+    
+    for (const auto& entry : indexTableVector) {
+        if (fs::exists(entry[0])) {
+            cleanedIndex.push_back(entry);
+        }
+    }
+    
+    vector_to_index(cleanedIndex);
 
     string treeContent = read_file_content(indexFile); // string of index file 
     string treeHash = get_hash(treeContent); // hash of index content 
@@ -487,7 +551,7 @@ void commit_command() {
     update_history(saveHash, saveContent);
 }
 
-//  +++++++++++++++++++++++++  RESET +++++++++++++++++++++++++++++++
+//  +++++++++++++++++++++++++  RESET (both hard & soft) +++++++++++++++++++++++++++++++
 
 void delete_files(vector<vector<string>> treeTableVector) {
 
@@ -512,6 +576,8 @@ void delete_files(vector<vector<string>> treeTableVector) {
         // If file does NOT EXIST in tree file DELETE it
 
         if(!shouldKeep) {
+            if (fileName == "bhm.exe" || fileName == "bhm") continue;  // ← Move check here
+            
             fs::path filePath = fileName;
 
             if(exists(filePath)) {
@@ -535,7 +601,55 @@ void update_main(string parentCommit, fs::path mainFile) {
 
 }
 
-string find_tree_hash(vector<string> args)  {
+void update_history_after_reset() {
+
+    string filename = ".mygit/history";
+
+    ifstream inFile(filename);
+    if (!inFile) return;
+
+    vector<std::string> lines;
+    string line;
+
+    // Read all lines into a vector
+    while (std::getline(inFile, line)) {
+        lines.push_back(line);
+    }
+    inFile.close();
+
+    // Find and remove the LAST commit block (from end, working backwards)
+    // A commit block starts with "Commit: " and ends with an empty line
+    
+    int lastCommitStart = -1;
+    
+    for (int i = lines.size() - 1; i >= 0; i--) {
+        if (lines[i].empty()) {
+            // Found the trailing empty line, go back to find "Commit:"
+            for (int j = i - 1; j >= 0; j--) {
+                if (lines[j].find("Commit:") == 0) {
+                    lastCommitStart = j;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    // Erase the last commit block (from lastCommitStart to end)
+    if (lastCommitStart != -1) {
+        lines.erase(lines.begin() + lastCommitStart, lines.end());
+    }
+
+    // Overwrite the original file with the remaining lines
+    std::ofstream outFile(filename, std::ios::trunc);
+    for (const auto& l : lines) {
+        outFile << l << "\n";
+    }
+    outFile.close();
+
+}
+
+string find_previous_tree_hash()  {
 
     //  Read the main file and get the hash of the latest commit
 
@@ -566,16 +680,12 @@ string find_tree_hash(vector<string> args)  {
     if(parentRow.substr(0,6) == "Parent") {
         parentCommit = parentRow.substr(15);
     }
-
-    // update refs/heads/main only when UNDO "RESET" is called
-
-    if(args[1] == "undo") {
-        update_main(parentCommit, mainFile);
+    
+    if(parentCommit == "   -   ") {
+        return parentCommit;
     }
-    if(parentCommit.empty()) {
-        cerr << "Error: Cannot go back, this is the first commit!" << endl;
-        return "";
-    }
+    
+    update_main(parentCommit, mainFile);
 
     // Get the hash of tree file from the PARENT commit
 
@@ -592,6 +702,32 @@ string find_tree_hash(vector<string> args)  {
 
     return parentTreeRow.substr(6);
     
+}
+
+string find_tree_hash() {
+
+    fs::path mainFile = ".mygit/refs/heads/main";
+    ifstream mainFileContent(mainFile);
+    stringstream ss;
+    ss << mainFileContent.rdbuf();
+    string commitHash = ss.str();
+    
+    string commitFolderName = commitHash.substr(0,2); 
+    string commitFileName = commitHash.substr(2);
+
+    // Go to that specific commit file
+
+    fs::path parentPath = ".mygit/objects";
+    fs::path commitFolderPath = parentPath / commitFolderName;
+    fs::path commitFilePath = commitFolderPath / commitFileName;
+
+    ifstream commitObject(commitFilePath);
+    string row;
+    getline(commitObject, row);
+    commitObject.close();
+
+    return row.substr(6);
+
 }
 
 vector<vector<string>> tree_to_vector(string treeHash) {
@@ -645,25 +781,39 @@ void create_files_again(vector<vector<string>> treeTableVector) {
 
         // Creating each file from scratch
 
-        ofstream newFile(newFilePath);
+        ifstream blobFile(blobFilePath, ios::binary);  // ← ADD: binary mode
+        stringstream buffer;
+        buffer << blobFile.rdbuf();
+        string content = buffer.str();
+        blobFile.close();
+
+        ofstream newFile(newFilePath, ios::binary);
         if (!newFile.is_open()) {
             cout << "Error! Couldn't create the file" << newFilePath << endl;
             return;
         }
-        newFile << read_file_content(blobFilePath);
+        if (content.substr(0, 7) == "BINARY:") {
+            newFile << base64_decode(content.substr(7));
+        } else {
+            newFile << content;
+        }
         newFile.close();
         
     }
 
 }
 
-void reset_command(vector<string> args) {
+// Takes you to the previous commit
+void reset_advanced() {
 
-    // Find hash of that tree file (1st go to the latest commit then find the hash of tree)
+    // Find hash of the tree file of the previous commit (1st go to the latest commit then find the hash of tree)
 
-    string treeHash = find_tree_hash(args);
+    string treeHash = find_previous_tree_hash();
 
-    if (treeHash == "") return;
+    if (treeHash == "   -   ") {
+        cout << "You are at 1st commit. Can't go back further.\n";
+        return ;
+    }
 
     // Get the 2d string vector of tree file
 
@@ -679,8 +829,38 @@ void reset_command(vector<string> args) {
 
     create_files_again(treeTableVector);
 
+    // Update the history file
+
+    update_history_after_reset();
+
     // Updating the INDEX file
     vector_to_index(treeTableVector);    
+
+    cout << "You are now one commit back.\n";
+    return ;
+
+}
+
+// Takes you to the latest commit
+void reset_command() {
+
+// reset command deletes all the changes in the working directory. Takes to the latest commit not the previous one. History remains unchanged.
+
+    // Read the ".mygit/refs/head/main" and go to the hash of the latest commit's tree
+
+    string treeHash = find_tree_hash();
+
+    vector<vector<string>> treeTableVector;
+
+    treeTableVector = tree_to_vector(treeHash);
+
+    // Delete extra files
+
+    delete_files(treeTableVector);
+
+    // Read the content from the hash wali file & Make a file of that exact name and write the content there
+
+    create_files_again(treeTableVector);
 
 }
 
@@ -693,41 +873,39 @@ void help_command() {
     cout << left << setw(10) << "save: "   << "Save Changes to the Repository." << endl;
     cout << left << setw(10) << "set: "    << "List the Username." << endl;
     cout << left << setw(10) << "history: " << "Show Previous Commits." << endl;
-    cout << left << setw(10) << "undo: "   << "Return to the Previous Commit Erasing the Current." << endl << endl;
+    cout << left << setw(10) << "undo: "   << "Return to the Latest Commit without Erasing the Current Commit." << endl;
+    cout << left << setw(10) << "undo save: "   << "Return to the Previous Commit, Erasing the Current Commit." << endl << endl;
 }
-
-
-
 
 //  +++++++++++++++++++++++++ REVERT (not completed yet.) +++++++++++++++++++++++++++++++
 
 void revert_command(vector<string> args) {
 
-    // Find hash of that tree file (1st go to the latest commit then find the hash of tree)
+//     // Find hash of that tree file (1st go to the latest commit then find the hash of tree)
 
-    string treeHash = find_tree_hash(args);
+//     string treeHash = find_tree_hash(args);
 
-    // Get the 2d string vector of tree file
+//     // Get the 2d string vector of tree file
 
-    vector<vector<string>> treeTableVector;
+//     vector<vector<string>> treeTableVector;
 
-    treeTableVector = tree_to_vector(treeHash);
+//     treeTableVector = tree_to_vector(treeHash);
 
-    // Delete EXTRA files
+//     // Delete EXTRA files
 
-    delete_files(treeTableVector);
+//     delete_files(treeTableVector);
 
-    // Read the content from the hash wali file & Make a file of that exact name and write the content there
+//     // Read the content from the hash wali file & Make a file of that exact name and write the content there
 
-    create_files_again(treeTableVector);
+//     create_files_again(treeTableVector);
 
-    // Updating the INDEX file because commit uses it
+//     // Updating the INDEX file because commit uses it
     
-    vector_to_index(treeTableVector);
+//     vector_to_index(treeTableVector);
 
-    // Make a new commit for revert
+//     // Make a new commit for revert
 
-    commit_command();
+//     commit_command();
 
 }
 
