@@ -1,6 +1,7 @@
 // Header File for declaring fucntions
 
 #include <iostream>
+#include <ctime>
 #include <iomanip>
 #include <filesystem>
 #include <vector>
@@ -137,9 +138,6 @@ string get_hash(string content) {
 }
 
 void create_blob_file(string stringHash, string content) {
-
-    // String slicing for the folder name and file name
-
     string folderName = stringHash.substr(0,2);
     string blobFilename = stringHash.substr(2);
 
@@ -151,27 +149,46 @@ void create_blob_file(string stringHash, string content) {
         fs::create_directories(targetDirectory);
     }
 
-    // Creating the blob file
-
-    std::ofstream blobFile(targetFile, ios::binary);
+    std::ofstream blobFile(targetFile, ios::binary);  // ← Binary mode for actual files
     if (!blobFile.is_open()) {
         cout << "Error! Couldn't create the file" << blobFilename << endl;
-        return ;
+        return;
     }
 
-    if (content.substr(0, 7) == "BINARY:") {
+    // ← Check if it's already encoded
+    if (content.length() >= 7 && content.substr(0, 7) == "BINARY:") {
         blobFile << base64_decode(content.substr(7));
     } else {
+        // Plain text content - write as-is
         blobFile << content;
     }
 
     blobFile.close();
 }
 
+void create_text_blob_file(string stringHash, string content) {
+    string folderName = stringHash.substr(0,2);
+    string blobFilename = stringHash.substr(2);
+
+    fs::path objectDirectory = ".mygit/objects";
+    fs::path targetDirectory = objectDirectory / folderName;
+    fs::path targetFile = targetDirectory / blobFilename;
+
+    if (!fs::exists(targetDirectory)) {
+        fs::create_directories(targetDirectory);
+    }
+
+    std::ofstream blobFile(targetFile);  // ← Text mode for text objects
+    if (!blobFile.is_open()) {
+        cout << "Error! Couldn't create the file" << blobFilename << endl;
+        return;
+    }
+
+    blobFile << content;
+    blobFile.close();
+}
+
 string read_file_content(fs::path filename) {
-
-    // Getting the string of file content
-
     ifstream file(filename, ios::binary);
     if (!file.is_open()) {
         return "";
@@ -179,8 +196,31 @@ string read_file_content(fs::path filename) {
     stringstream buffer;
     buffer << file.rdbuf();
     string content = buffer.str();
+    
+    // Check if content is likely binary (contains null bytes or many non-printable chars)
+    int nonPrintable = 0;
+    for (unsigned char c : content) {
+        if (c == '\0' || (c < 32 && c != '\n' && c != '\r' && c != '\t')) {
+            nonPrintable++;
+        }
+    }
+    
+    // If more than 5% non-printable, treat as binary
+    if (nonPrintable > content.length() * 0.05) {
+        return "BINARY:" + base64_encode(content);
+    }
+    
+    return content;  // Return as plain text
+}
 
-    return "BINARY:" + base64_encode(content);
+string read_text_file(fs::path filename) {
+    ifstream file(filename);  // ← Text mode, NO binary
+    if (!file.is_open()) {
+        return "";
+    }
+    stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();  // ← No encoding
 }
 
 vector<vector<string>> index_to_vector() {
@@ -228,59 +268,42 @@ bool check_for_repo() {
 
 void add_command(int argc, vector<string> args) {
 
-// Check if the repo is already initialized or not?
-
     if (!check_for_repo()) {
         cout << "Error: Not a git repository!" << endl;
         cout << "Try running 'bhm create' first!" << endl;
         return;
     }
 
-// If no file given
-
     if (argc<3) {
         cout << "Please give a filename!";
         return;
     }
 
-// DONE 1- If the file is already added and is changed. ---> Hash is changed so: Two available options: 1- Make a new blob of it. 2- Overwrite its hash in index file.
-// DONE 2- If the file is already added and not changed. ---> Simply ignore it by comparing hash.
-// DONE 3- If the file doesn't exist there. ---> Show error on just that file ke the file doesn't exist and ADD the rest of the files.
-// DONE 4- Gave no file at all. ---> Show error ke you gave no file at all.
-
     vector<vector<string>> indexTableVector = index_to_vector();
-
-// -------------- Running loop for all the files --------------
 
     for (int i=2; i<argc; i++) {
 
-    // Find the path of files
-
         fs::path filename = args[i];
         string filenameString = args[i];
-
-    // Check if that file exists or not
 
         if (!fs::exists(filename)) {
             cout << filename << " doesn't exist! Adding other files..." << endl;
             continue;
         }
 
-    // Generate the string of blob file
+        ifstream file(filename, ios::binary);
+        stringstream buffer;
+        buffer << file.rdbuf();
+        string rawContent = buffer.str();
+        file.close();
 
-        string stringContent = read_file_content(filename);
-
-    // Generate the name (hash) of the blob
-
-        string stringHash = get_hash(stringContent);
-
-    // Save the blob file in desired path
-
+        string stringHash = get_hash(rawContent);
+        
+        // ← CHANGE: Use read_file_content logic to detect binary
+        string stringContent = read_file_content(filename);  // Smart encoding
         create_blob_file(stringHash, stringContent);
 
-    // Update the hash of that file whose content is changed        
-
-       bool found = false;
+        bool found = false;
 
         for (int row=0; row<indexTableVector.size(); row++) {
             if (filenameString == indexTableVector[row][0]) {
@@ -311,14 +334,10 @@ void add_command(int argc, vector<string> args) {
     }
 
     vector_to_index(indexTableVector);
-
     cout << "All files added successfully!";
-
 }
 
 void add_all_command() {
-
-    // Check if the repo is already initialized or not?
 
     if (!check_for_repo()) {
         cout << "Error: Not a git repository!" << endl;
@@ -327,8 +346,6 @@ void add_all_command() {
     }
 
     vector<vector<string>> indexTableVector = index_to_vector();
-
-    bool indexChanged = false;
 
     for (const auto& entry : fs::directory_iterator(".")) {
 
@@ -339,8 +356,16 @@ void add_all_command() {
 
         if (filenameString == "bhm" || filenameString == "bhm.exe") continue;
 
-        string content = read_file_content(filePath);
-        string hash = get_hash(content);
+        ifstream file(filePath, ios::binary);
+        stringstream buffer;
+        buffer << file.rdbuf();
+        string rawContent = buffer.str();
+        file.close();
+
+        string hash = get_hash(rawContent);
+        
+        // ← CHANGE: Use read_file_content logic to detect binary
+        string content = read_file_content(filePath);  // Smart encoding
         create_blob_file(hash, content);
 
         bool found = false;
@@ -374,7 +399,6 @@ void add_all_command() {
     }
 
     vector_to_index(indexTableVector);
-
 }
 
 //  +++++++++++++++++++++++++  CONFIG  ++++++++++++++++++++++++++++
@@ -401,13 +425,17 @@ void config_command(int argc, vector<string> args) {
 }
 
 string use_config() {
-
-    // Use this name in every commit
-
     ifstream configFile(".mygit/config");
     stringstream buffer;
     buffer << configFile.rdbuf();
-    return buffer.str();
+    string result = buffer.str();
+    
+    // Trim trailing whitespace
+    while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) {
+        result.pop_back();
+    }
+    
+    return result;
 }
 
 //  +++++++++++++++++++++++++  LOG  +++++++++++++++++++++++++++++++
@@ -415,11 +443,20 @@ string use_config() {
 void update_history(string saveHash, string saveContent) {
 
     string historyFile = ".mygit/history";
-    ofstream file(historyFile, ios:: app);  
-    file << "Commit: " << saveHash << "\n";
-    file << saveContent << "\n\n";
-    return;
+    ifstream checkFile(historyFile);
+    bool isEmpty = checkFile.peek() == EOF;
+    checkFile.close();
     
+    ofstream file(historyFile, ios::app);  
+    
+    // Only add separator if file is not empty
+    if (!isEmpty) {
+        file << "\n";
+    }
+    
+    file << "Commit: " << saveHash << "\n";
+    file << saveContent << "\n";
+    file.close();
 }
 
 void display_history() {
@@ -428,7 +465,7 @@ void display_history() {
 
     fs::path historyPath = ".mygit/history";
 
-    string content = read_file_content(historyPath);
+    string content = read_text_file(historyPath);
 
     cout << content;
     
@@ -473,14 +510,14 @@ void commit_command() {
     
     vector_to_index(cleanedIndex);
 
-    string treeContent = read_file_content(indexFile); // string of index file 
+    string treeContent = read_text_file(indexFile); // string of index file 
     string treeHash = get_hash(treeContent); // hash of index content 
 
     // Check if there are any changes to commit
     if(!fs::is_empty(mainFile)) 
     {
         
-        string mainContent = read_file_content(mainFile); // hash of last commit 
+        string mainContent = read_text_file(mainFile); // hash of last commit 
         string indexHash;
         fs::path findCommit = ".mygit/objects/" + mainContent.substr(0,2) + "/" + mainContent.substr(2); // path of last commit object
         ifstream commitContent(findCommit); 
@@ -509,7 +546,7 @@ void commit_command() {
     string parentCommit = "   -   ";
     if(!fs::is_empty(mainFile))
     {
-        parentCommit = read_file_content(mainFile);
+        parentCommit = read_text_file(mainFile);
     }
     //Timestamp
     string timeStamp = get_timestamp();
@@ -517,7 +554,7 @@ void commit_command() {
     string committer = "   -   ";
     if(!fs::is_empty(configFile))
     {
-        committer = read_file_content(configFile);
+        committer = read_text_file(configFile);
     }
     //Message 
     string message;
@@ -542,7 +579,7 @@ void commit_command() {
                          
     string saveHash = get_hash(saveContent);
     //time to create commit object
-    create_blob_file(saveHash,saveContent); //store commit object
+    create_text_blob_file(saveHash,saveContent); //store commit object
     //updating main
     ofstream main(mainFile, ios::trunc);
     main << saveHash;
@@ -611,83 +648,68 @@ void update_history_after_reset() {
     vector<std::string> lines;
     string line;
 
-    // Read all lines into a vector
     while (std::getline(inFile, line)) {
         lines.push_back(line);
     }
     inFile.close();
 
-    // Find and remove the LAST commit block (from end, working backwards)
-    // A commit block starts with "Commit: " and ends with an empty line
-    
+    // Find the LAST "Commit: " line (last commit block start)
     int lastCommitStart = -1;
     
     for (int i = lines.size() - 1; i >= 0; i--) {
-        if (lines[i].empty()) {
-            // Found the trailing empty line, go back to find "Commit:"
-            for (int j = i - 1; j >= 0; j--) {
-                if (lines[j].find("Commit:") == 0) {
-                    lastCommitStart = j;
-                    break;
-                }
-            }
+        if (lines[i].find("Commit:") == 0) {  // ← More robust check
+            lastCommitStart = i;
             break;
         }
     }
 
-    // Erase the last commit block (from lastCommitStart to end)
+    // If found, erase from that line to the end
     if (lastCommitStart != -1) {
         lines.erase(lines.begin() + lastCommitStart, lines.end());
     }
 
-    // Overwrite the original file with the remaining lines
+    // Overwrite the file
     std::ofstream outFile(filename, std::ios::trunc);
     for (const auto& l : lines) {
         outFile << l << "\n";
     }
     outFile.close();
-
 }
 
-string find_previous_tree_hash()  {
-
-    //  Read the main file and get the hash of the latest commit
+string find_previous_tree_hash() {
 
     fs::path mainFile = ".mygit/refs/heads/main";
-    ifstream mainFileContent(mainFile);
-    stringstream ss;
-    ss << mainFileContent.rdbuf();
-    string commitHash = ss.str();
+    string commitHash = read_text_file(mainFile);
     
+    if (commitHash.empty()) {
+        cout << "You are at 1st commit. Can't go back further.\n";
+        return "   -   ";
+    }
+
     string commitFolderName = commitHash.substr(0,2); 
     string commitFileName = commitHash.substr(2);
 
-    // Go to that specific commit file
-
-    fs::path parentPath = ".mygit/objects";
-    fs::path commitFolderPath = parentPath / commitFolderName;
-    fs::path commitFilePath = commitFolderPath / commitFileName;
+    fs::path commitFilePath = fs::path(".mygit/objects") / commitFolderName / commitFileName;
 
     ifstream commitObject(commitFilePath);
     string row;
     string parentRow, parentCommit;
-    getline(commitObject, row); // Just here to move cursor to next line
+    getline(commitObject, row);
     getline(commitObject, parentRow);
     commitObject.close();
 
-    // Find the PARENT commit 
-
-    if(parentRow.substr(0,6) == "Parent") {
-        parentCommit = parentRow.substr(15);
+    if(parentRow.find("Parent Commit:") != string::npos) {  
+        size_t pos = parentRow.find(": ");
+        if (pos != string::npos) {
+            parentCommit = parentRow.substr(pos + 2);  
+        }
     }
     
-    if(parentCommit == "   -   ") {
+    if(parentCommit == "   -   " || parentCommit.empty()) {
         return parentCommit;
     }
     
     update_main(parentCommit, mainFile);
-
-    // Get the hash of tree file from the PARENT commit
 
     string parentFolder = parentCommit.substr(0, 2);
     string parentFile = parentCommit.substr(2);
@@ -698,28 +720,23 @@ string find_previous_tree_hash()  {
     getline(parentObject, parentTreeRow);
     parentObject.close();
 
-    // Return the PARENT tree hash
-
     return parentTreeRow.substr(6);
-    
 }
 
 string find_tree_hash() {
 
     fs::path mainFile = ".mygit/refs/heads/main";
-    ifstream mainFileContent(mainFile);
-    stringstream ss;
-    ss << mainFileContent.rdbuf();
-    string commitHash = ss.str();
+    string commitHash = read_text_file(mainFile);  // ← Changed
+
+    if (commitHash.empty()) {
+        cout << "Error: No commits found!\n";
+        return "";
+    }
     
     string commitFolderName = commitHash.substr(0,2); 
     string commitFileName = commitHash.substr(2);
 
-    // Go to that specific commit file
-
-    fs::path parentPath = ".mygit/objects";
-    fs::path commitFolderPath = parentPath / commitFolderName;
-    fs::path commitFilePath = commitFolderPath / commitFileName;
+    fs::path commitFilePath = fs::path(".mygit/objects") / commitFolderName / commitFileName;
 
     ifstream commitObject(commitFilePath);
     string row;
@@ -727,12 +744,9 @@ string find_tree_hash() {
     commitObject.close();
 
     return row.substr(6);
-
 }
 
 vector<vector<string>> tree_to_vector(string treeHash) {
-
-    // Making the 2d string vector of tree file
 
     string treeFolderName = treeHash.substr(0,2); 
     string treeFileName = treeHash.substr(2);
@@ -741,9 +755,9 @@ vector<vector<string>> tree_to_vector(string treeHash) {
     fs::path treeFolderPath = parentPath / treeFolderName;
     fs::path treeFilePath = treeFolderPath / treeFileName;
 
-
     vector<vector<string>> treeTableVector;
-    ifstream treeFile (treeFilePath);
+    // ← Tree files are always text (index snapshots), read as text
+    ifstream treeFile(treeFilePath);  // NO binary mode for tree files
     string line;
 
     while (getline(treeFile, line)) {
@@ -756,15 +770,12 @@ vector<vector<string>> tree_to_vector(string treeHash) {
         }
         treeTableVector.push_back(row);
     }
-
-    // Return the vector
-
+    
+    treeFile.close();
     return treeTableVector;
 }
 
 void create_files_again(vector<vector<string>> treeTableVector) {
-
-    // Run the loop for all files
 
     for (int i=0; i<treeTableVector.size(); i++) {
 
@@ -779,9 +790,7 @@ void create_files_again(vector<vector<string>> treeTableVector) {
         fs::path blobFilePath = blobFolderPath / blobFileName;
         fs::path newFilePath = "." / fileName;
 
-        // Creating each file from scratch
-
-        ifstream blobFile(blobFilePath, ios::binary);  // ← ADD: binary mode
+        ifstream blobFile(blobFilePath, ios::binary);
         stringstream buffer;
         buffer << blobFile.rdbuf();
         string content = buffer.str();
@@ -792,15 +801,15 @@ void create_files_again(vector<vector<string>> treeTableVector) {
             cout << "Error! Couldn't create the file" << newFilePath << endl;
             return;
         }
-        if (content.substr(0, 7) == "BINARY:") {
+        
+        // ← ADD: Check length before substr
+        if (content.length() >= 7 && content.substr(0, 7) == "BINARY:") {
             newFile << base64_decode(content.substr(7));
         } else {
             newFile << content;
         }
         newFile.close();
-        
     }
-
 }
 
 // Takes you to the previous commit
