@@ -123,22 +123,34 @@ bhm history
 * History file gets updated in the save command. 
 * This command only displays the content of the history file.
 
+## Features added in Version 2.0
+
 ### undo 
 ```bash
 bhm undo
 ```
-![undo Command](images/reset1.JPG)
-
-![undo Command](images/reset2.JPG)
 
 #### Logic 
 
-* Finds the parent commit of the current commit.
-* Reads the tree (file list and hashes) from that commit.
-* Deletes files that do not exist in the target commit.
+* Finds the parent commit of the latest commit.
+* Reads the tree file from that commit.
+* Deletes files that are listed in that tree file.
 * Recreates required files using stored file contents.
-* Updates the index to match the restored state.
-* Updates the current commit pointer after undoing changes.
+
+### undo save 
+```bash
+bhm undo save
+```
+
+#### Logic 
+
+* Finds the parent commit of the previous commit.
+* Reads the tree file from that commit.
+* Deletes files that are listed in that tree file.
+* Recreates required files using stored file contents.
+* Updates the commit pointer and now points to the previous commit hash.
+* Delete the commit object from the history file.
+
 
 
 
@@ -158,6 +170,48 @@ bhm undo
 
 **Console Interface (iostream and iomanip)** – Command-line interface for interacting with the user and displaying formatted messages.
 
+**Binary Encoding** – Converts files into binary for processing.
+
+## Supported File Formats
+
+With the binary conversion and Base64 encoding implementation, **BHM now supports virtually all file formats**:
+
+### ✅ Text-Based Formats (Native Support)
+| Format | Extension | Use Case |
+|--------|-----------|----------|
+| Plain Text | `.txt`, `.log`, `.md` | Documentation, logs, notes |
+| Markdown | `.md`, `.markdown` | Documentation |
+| Source Code | `.cpp`, `.h`, `.py`, `.java`, `.js`, `.ts`, `.c`, `.go`, `.rs` | Programming |
+| Web Languages | `.html`, `.css`, `.scss`, `.xml` | Web development |
+| Configuration | `.json`, `.yaml`, `.yml`, `.ini`, `.conf`, `.toml` | Config files |
+| Data Files | `.csv`, `.tsv` | Spreadsheet data |
+| Shell Scripts | `.sh`, `.bash`, `.bat`, `.cmd` | Scripts |
+| SQL | `.sql` | Database queries |
+
+### ✅ Binary Formats (Base64 Encoded Support)
+| Format | Extension | Use Case |
+|--------|-----------|----------|
+| Images | `.png`, `.jpg`, `.jpeg`, `.gif`, `.bmp`, `.svg`, `.ico`, `.webp` | Graphics, photos |
+| Audio | `.mp3`, `.wav`, `.flac`, `.aac`, `.ogg`, `.m4a` | Music, sound files |
+| Video | `.mp4`, `.mkv`, `.avi`, `.mov`, `.flv`, `.webm` | Movies, videos |
+| Archives | `.zip`, `.rar`, `.7z`, `.tar`, `.gz`, `.bz2` | Compressed files |
+| Documents | `.pdf`, `.docx`, `.xlsx`, `.pptx` | Office documents |
+| Executables | `.exe`, `.dll`, `.so`, `.dylib` | Programs, libraries |
+| Compressed | `.gz`, `.bz2`, `.xz` | Compressed archives |
+| Fonts | `.ttf`, `.otf`, `.woff`, `.woff2` | Typography |
+| Database | `.db`, `.sqlite`, `.mdb` | Database files |
+
+### Technical Details
+
+- **Text files:** Stored directly with Base64 encoding for consistency
+- **Binary files:** Automatically detected and encoded/decoded transparently
+- **Encoding marker:** Files are prefixed with `BINARY:` to identify encoded content
+- **Storage overhead:** Approximately 33% larger due to Base64 encoding
+- **File integrity:** SHA1 hashing ensures data integrity across all formats
+
+### Summary
+
+**Total supported formats: 50+**
 
 ## Instructions to Run
 
